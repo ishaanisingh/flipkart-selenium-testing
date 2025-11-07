@@ -1,0 +1,84 @@
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
+
+SEARCH_TERM = "samsung 55 inch 4k tv"
+PARTIAL_PRODUCT_TITLE = "Crystal 4K Infinity Vision 138 cm" 
+
+driver = webdriver.Chrome()  # Setup the driver
+
+try:
+    wait = WebDriverWait(driver, 10) #10-second wait time
+    
+    driver.get("https://www.flipkart.com") # Open Flipkart and maximize
+    driver.maximize_window()
+
+    search_box = wait.until(EC.element_to_be_clickable((By.NAME, "q")))  #  Find search box
+    search_box.send_keys(SEARCH_TERM)
+    search_box.submit()
+
+    # Get main page handle
+    main_page = driver.current_window_handle
+    print(f"Main page = {main_page}")
+
+    # Click the specific product
+    product_link_xpath = f"//div[contains(text(), '{PARTIAL_PRODUCT_TITLE}')]"
+    print(f"Waiting for product containing: {PARTIAL_PRODUCT_TITLE}")
+    product_link = wait.until(EC.element_to_be_clickable((By.XPATH, product_link_xpath)))
+    product_link.click()
+
+    # Switch to the new tab
+    wait.until(EC.number_of_windows_to_be(2))
+    all_pages = driver.window_handles
+    for page in all_pages:
+        if page != main_page:
+            driver.switch_to.window(page)
+            print("Switched to new tab")
+            break
+
+    print(f"New tab URL: {driver.current_url}")
+
+    # Find button ("ADD TO CART" or "BUY NOW")
+    
+    ADD_TO_CART_XPATH = "//button[normalize-space()='ADD TO CART'] | //input[@value='ADD TO CART'] | //button[normalize-space()='Add to cart']"
+    BUY_NOW_XPATH = "//button[normalize-space()='BUY NOW'] | //input[@value='BUY NOW']"
+    
+    cart_button = None 
+
+    try:
+        #find "ADD TO CART"
+        cart_button = wait.until(EC.element_to_be_clickable((By.XPATH, ADD_TO_CART_XPATH)))
+        print("Found 'ADD TO CART' button.")
+    
+    except TimeoutException:
+        # If "ADD TO CART" fails, try "BUY NOW".
+        print("'ADD TO CART' not found, trying 'BUY NOW'...")
+        cart_button = wait.until(EC.element_to_be_clickable((By.XPATH, BUY_NOW_XPATH)))
+        print("Found 'BUY NOW' button.")
+
+    driver.execute_script("arguments[0].scrollIntoView(true);", cart_button)
+    time.sleep(0.5) # Give a half-second for the scroll to finish
+    
+    driver.execute_script("arguments[0].click();", cart_button)
+    
+    print("Button clicked successfully")
+    
+    time.sleep(3)
+
+except TimeoutException:
+    print(f"\n--- TEST FAILED ---")
+    print(f"Error: Timed out. Could not find the product OR 'ADD TO CART' OR 'BUY NOW'.")
+    print("The test has failed.")
+except ElementClickInterceptedException:
+    print(f"\n--- TEST FAILED ---")
+    print("Error: The click was intercepted.")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
+
+finally:
+    # Clean up
+    print("Script finished. Closing browser.")
+    driver.quit()
